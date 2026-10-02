@@ -1,0 +1,19 @@
+package tests;
+
+use ecosystem::graph::{Graph, directed_cycle};
+use std::testing;
+
+#[test]
+fn downstream_cycle_witness_identifies_dependency_edges() -> () {
+    let graph: Graph[string, string] = Graph::new(true);
+    let compile = graph.add_node("compile");
+    let link = graph.add_node("link");
+    let forward = testing::expect_ok(graph.add_edge(compile, link, "object"), "dependency");
+    let back = testing::expect_ok(graph.add_edge(link, compile, "generated source"), "cycle");
+    let edges = testing::expect_some(testing::expect_ok(directed_cycle(graph), "search"), "cycle");
+    testing::assert(edges == Vec::from_array([forward, back]));
+    testing::assert_eq(
+        testing::expect_ok(graph.edge(edges[1]), "edge label").value,
+        "generated source",
+    );
+}

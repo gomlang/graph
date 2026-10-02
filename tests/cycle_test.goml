@@ -1,0 +1,85 @@
+package tests;
+
+use ecosystem::graph::{Graph, EdgeId, ErrorKind, directed_cycle, topological_sort};
+use std::testing;
+
+fn check_cycle(graph: Graph[(), ()], edges: Vec[EdgeId]) -> () {
+    testing::assert(!edges.is_empty());
+    for index in 0..edges.len() {
+        let edge = testing::expect_ok(graph.edge(edges[index]), "cycle edge");
+        let next = testing::expect_ok(graph.edge(edges[(index + 1) % edges.len()]), "next edge");
+        testing::assert_eq(edge.to, next.from);
+    }
+}
+
+#[test]
+fn directed_cycle_matches_exhaustive_small_graph_acyclicity() -> () {
+    for mask in 0..512 {
+        let graph: Graph[(), ()] = Graph::new(true);
+        let nodes = Vec::from_array([graph.add_node(()), graph.add_node(()), graph.add_node(())]);
+        for from in 0..3 {
+            for to in 0..3 {
+                if (mask & (1 << (from * 3 + to))) != 0 {
+                    testing::assert_ok(graph.add_edge(nodes[from], nodes[to], ()));
+                }
+            }
+        }
+        let result = testing::expect_ok(directed_cycle(graph), "cycle search");
+        testing::assert(result.is_some() == topological_sort(graph).is_err());
+        if let Some(edges) = result {
+            check_cycle(graph, edges);
+            testing::assert(
+                testing::expect_ok(directed_cycle(graph), "repeat") == Option::Some(edges),
+            );
+        }
+    }
+}
+
+#[test]
+fn directed_cycles_preserve_edge_identity_and_ignore_removed_edges() -> () {
+    let graph: Graph[(), ()] = Graph::new(true);
+    let a = graph.add_node(());
+    let b = graph.add_node(());
+    let first = testing::expect_ok(graph.add_edge(a, b, ()), "first");
+    let second = testing::expect_ok(graph.add_edge(a, b, ()), "parallel");
+    let back = testing::expect_ok(graph.add_edge(b, a, ()), "back");
+    testing::assert_ok(graph.remove_edge(first));
+    testing::assert(
+        testing::expect_ok(directed_cycle(graph), "cycle")
+            == Option::Some(Vec::from_array([second, back])),
+    );
+    testing::assert_ok(graph.remove_edge(back));
+    testing::assert_none(testing::expect_ok(directed_cycle(graph), "dag"));
+    let loop_edge = testing::expect_ok(graph.add_edge(b, b, ()), "loop");
+    testing::assert(
+        testing::expect_ok(directed_cycle(graph), "loop witness")
+            == Option::Some(Vec::from_array([loop_edge])),
+    );
+    graph.clear();
+    testing::assert_none(testing::expect_ok(directed_cycle(graph), "empty"));
+    let undirected: Graph[(), ()] = Graph::new(false);
+    testing::assert_eq(
+        testing::expect_err(directed_cycle(undirected), "wrong kind").kind,
+        ErrorKind::RequiresDirected,
+    );
+}
+
+#[test]
+fn directed_cycle_uses_an_explicit_stack_on_deep_graphs() -> () {
+    let graph: Graph[(), ()] = Graph::new(true);
+    let first = graph.add_node(());
+    let mut previous = first;
+    for _ in 0..5000 {
+        let next = graph.add_node(());
+        testing::assert_ok(graph.add_edge(previous, next, ()));
+        previous = next;
+    }
+    testing::assert_none(testing::expect_ok(directed_cycle(graph), "chain"));
+    testing::assert_ok(graph.add_edge(previous, first, ()));
+    let edges = testing::expect_some(
+        testing::expect_ok(directed_cycle(graph), "deep cycle"),
+        "witness",
+    );
+    testing::assert_eq(edges.len(), 5001);
+    check_cycle(graph, edges);
+}
