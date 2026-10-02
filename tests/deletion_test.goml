@@ -1,0 +1,63 @@
+package tests;
+
+use ecosystem::graph::{Graph};
+use std::testing;
+
+#[test]
+fn removing_parallel_edges_filters_survivors_once_in_order() -> () {
+    for directed in Vec::from_array([false, true]) {
+        let graph: Graph[isize, isize] = Graph::new(directed);
+        let center = graph.add_node(0);
+        let left = graph.add_node(1);
+        let right = graph.add_node(2);
+        let first = testing::expect_ok(graph.add_edge(left, right, 7), "first survivor");
+        let removed = Vec::new();
+        for index in 0..4000 {
+            removed.push(testing::expect_ok(graph.add_edge(center, left, index), "outgoing"));
+            removed.push(testing::expect_ok(graph.add_edge(left, center, index), "incoming"));
+            removed.push(testing::expect_ok(graph.add_edge(center, center, index), "loop"));
+        }
+        let second = testing::expect_ok(graph.add_edge(left, right, 8), "second survivor");
+        let alias = graph;
+        testing::assert_eq(testing::expect_ok(graph.remove_node(center), "remove center"), 0);
+        testing::assert_eq(alias.node_count(), 2);
+        testing::assert_eq(alias.edge_count(), 2);
+        testing::assert(!alias.contains_node(center));
+        for edge in removed {
+            testing::assert(!alias.contains_edge(edge));
+        }
+        testing::assert(
+            testing::expect_ok(alias.edges_between(left, right), "ordered survivors")
+                == Vec::from_array([first, second]),
+        );
+        testing::assert_eq(testing::expect_ok(alias.predecessors(right), "predecessors").len(), 2);
+        testing::assert(alias.remove_node(center).is_err());
+        testing::assert_eq(alias.edge_count(), 2);
+    }
+}
+
+#[test]
+fn clear_invalidates_handles_without_reusing_slots_or_breaking_aliases() -> () {
+    let graph: Graph[(), ()] = Graph::new(false);
+    let first = graph.add_node(());
+    let second = graph.add_node(());
+    let edge = testing::expect_ok(graph.add_edge(first, second, ()), "edge");
+    testing::assert_ok(graph.add_edge(first, first, ()));
+    let alias = graph;
+    graph.clear();
+    graph.clear();
+    testing::assert_eq(alias.node_count(), 0);
+    testing::assert_eq(alias.edge_count(), 0);
+    testing::assert(alias.nodes().is_empty());
+    testing::assert(alias.edges().is_empty());
+    let replacement = alias.add_node(());
+    testing::assert(replacement.index() > second.index());
+    testing::assert(!graph.contains_node(first));
+    testing::assert(!graph.contains_edge(edge));
+    let replacement_edge = testing::expect_ok(
+        graph.add_edge(replacement, replacement, ()),
+        "new loop",
+    );
+    testing::assert(replacement_edge.index() > edge.index());
+    testing::assert_eq(testing::expect_ok(alias.neighbors(replacement), "new adjacency").len(), 1);
+}

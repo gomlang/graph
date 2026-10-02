@@ -1,0 +1,24 @@
+package tests;
+
+use ecosystem::graph::{Graph, bfs};
+use std::testing;
+
+#[test]
+fn downstream_deletion_keeps_paths_and_shared_handles_consistent() -> () {
+    let graph: Graph[string, ()] = Graph::new(true);
+    let first = graph.add_node("first");
+    let removed = graph.add_node("removed");
+    let last = graph.add_node("last");
+    testing::assert_ok(graph.add_edge(first, removed, ()));
+    testing::assert_ok(graph.add_edge(removed, first, ()));
+    testing::assert_ok(graph.add_edge(first, last, ()));
+    testing::assert_ok(graph.remove_node(removed));
+    testing::assert(
+        testing::expect_ok(bfs(graph, first), "surviving path") == Vec::from_array([first, last]),
+    );
+    let alias = graph;
+    graph.clear();
+    testing::assert_eq(alias.node_count(), 0);
+    testing::assert(alias.node(first).is_err());
+    testing::assert(alias.add_node("new").index() > last.index());
+}
