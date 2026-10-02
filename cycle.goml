@@ -1,0 +1,49 @@
+package graph;
+
+pub fn directed_cycle[N, E](graph: Graph[N, E]) -> Result[Option[Vec[EdgeId]], Error] {
+    if !graph.is_directed() {
+        return Result::Err(
+            error(ErrorKind::RequiresDirected, "cycle witness requires a directed graph"),
+        )
+    }
+    let colors: HashMap[NodeId, isize] = HashMap::new();
+    let parents: HashMap[NodeId, EdgeId] = HashMap::new();
+    for (start, _) in graph.nodes() {
+        if colors.contains(start) {
+            continue;
+        }
+        colors.set(start, 1);
+        let stack = Vec::from_array([(start, graph.neighbors(start)?, 0)]);
+        while !stack.is_empty() {
+            let index = stack.len() - 1;
+            let (node, neighbors, next) = stack[index];
+            if next == neighbors.len() {
+                colors.set(node, 2);
+                let _ = stack.pop();
+                continue;
+            }
+            let neighbor = neighbors[next];
+            stack[index] = (node, neighbors, next + 1);
+            let color = colors.get(neighbor.node).unwrap_or(0);
+            if color == 0 {
+                parents.set(neighbor.node, neighbor.edge);
+                colors.set(neighbor.node, 1);
+                stack.push((neighbor.node, graph.neighbors(neighbor.node)?, 0));
+            } else if color == 1 {
+                let edges = Vec::new();
+                let mut current = node;
+                while current != neighbor.node {
+                    let parent = parents.get(current).ok_or(
+                        error(ErrorKind::InvalidNode, "cycle parent is unavailable"),
+                    )?;
+                    edges.push(parent);
+                    current = graph.edge(parent)?.from;
+                }
+                edges.reverse();
+                edges.push(neighbor.edge);
+                return Result::Ok(Option::Some(edges))
+            }
+        }
+    }
+    Result::Ok(Option::None)
+}

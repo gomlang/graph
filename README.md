@@ -76,6 +76,17 @@ integer value is reserved as an infinity sentinel. `Forest` reports selected
 edges, total cost and component count, including isolated live nodes; empty
 graphs have zero components. Equal-weight forest edges are ordered by edge slot.
 
+`directed_cycle(graph)` returns `Some(Vec[EdgeId])` containing one directed
+cycle in traversal order, or `None` when the graph is acyclic. Consecutive edges
+connect and the last edge closes back to the first source. A self-loop is a
+one-edge cycle; parallel edges keep their distinct IDs. The search visits live
+nodes in slot order and follows stored adjacency order, so repeated calls on an
+unchanged graph return the same witness. The graph must be directed; undirected
+inputs return `RequiresDirected`. Search uses an explicit DFS stack and takes
+O(S + V + E) time and O(V + E) auxiliary storage without recursing on graph depth.
+Returned handles describe the graph at search time and may be invalidated by
+later mutation.
+
 ## Complexity and constraints
 
 Let S be allocated node/edge slots (including deleted slots), V live nodes, and
