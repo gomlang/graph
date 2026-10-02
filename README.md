@@ -83,8 +83,12 @@ E live edges. Enumeration scans the relevant slot array. Traversals and SCCs
 take O(S + V + E); Dijkstra takes O(S + (V + E) log(V + E)) with a lazy heap;
 Bellman–Ford takes O(S + VE); Kruskal takes O(S + E log E). A* can revisit nodes
 with inconsistent heuristics. Adjacency lookup copies O(degree) values. Edge
-deletion scans its endpoint adjacency vectors, and deleting a high-degree node
-can be quadratic in its incident edge count.
+deletion scans its endpoint adjacency vectors. Node deletion marks all incident
+edges once and filters each affected neighbor's adjacency once, taking
+O(degree + total adjacency size of affected neighbors), including parallel
+edges and loops. `clear` takes O(S + E), invalidates every old handle, and retains
+slot history so later insertions never revive deleted handles. Both operations
+preserve graph aliases and the adjacency order of surviving edges.
 
 Callbacks must not mutate the graph being processed. Shared storage is not
 synchronized for concurrent access. Costs are `i64`; floating weights, graph

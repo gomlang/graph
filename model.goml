@@ -208,10 +208,36 @@ impl[N, E] Graph[N, E] {
         let previous = self.node(id)?;
         let incident = self.outgoing[id.slot].copy();
         incident.extend(self.incoming[id.slot]);
-        for edge in incident {
-            if self.contains_edge(edge) {
-                let _ = self.remove_edge(edge)?;
+        let affected: HashMap[NodeId, bool] = HashMap::new();
+        for edge_id in incident {
+            if let Some(edge) = self.edge_slots[edge_id.slot] {
+                self.edge_slots[edge_id.slot] = Option::None;
+                self.edge_count_value.set(self.edge_count() - 1);
+                if edge.from != id {
+                    affected.set(edge.from, true);
+                }
+                if edge.to != id {
+                    affected.set(edge.to, true);
+                }
             }
+        }
+        self.outgoing[id.slot] = Vec::new();
+        self.incoming[id.slot] = Vec::new();
+        for (node, _) in affected.entries() {
+            let outgoing: Vec[EdgeId] = Vec::new();
+            for edge in self.outgoing[node.slot] {
+                if self.edge_slots[edge.slot].is_some() {
+                    outgoing.push(edge);
+                }
+            }
+            self.outgoing[node.slot] = outgoing;
+            let incoming: Vec[EdgeId] = Vec::new();
+            for edge in self.incoming[node.slot] {
+                if self.edge_slots[edge.slot].is_some() {
+                    incoming.push(edge);
+                }
+            }
+            self.incoming[node.slot] = incoming;
         }
         self.node_slots[id.slot] = Option::None;
         self.node_count_value.set(self.node_count() - 1);
@@ -281,9 +307,16 @@ impl[N, E] Graph[N, E] {
     }
 
     pub fn clear(self: Graph[N, E]) -> () {
-        for node in self.nodes() {
-            let _ = self.remove_node(node.0);
+        for slot in 0..self.node_slots.len() {
+            self.node_slots[slot] = Option::None;
+            self.outgoing[slot] = Vec::new();
+            self.incoming[slot] = Vec::new();
         }
+        for slot in 0..self.edge_slots.len() {
+            self.edge_slots[slot] = Option::None;
+        }
+        self.node_count_value.set(0);
+        self.edge_count_value.set(0);
     }
 }
 
