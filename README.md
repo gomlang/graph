@@ -100,7 +100,19 @@ graphs, 80 deterministic weighted graphs compared against Floyd–Warshall from
 every source, 32 complete four-node graphs compared against exhaustive spanning
 tree subsets, A* reopening and a 3,000-node chain/cycle.
 
-`consumer` uses normal versioned registry dependencies and downstream
-label types. Run `(cd ../verification && just ecosystem-test graph)` from this library repository to
-check both modules, build a consumer twice, verify cached artifact stability,
-and run the executable.
+`examples/basic` supplies its own label types. Run
+`(cd ../verification && just ecosystem-test graph)` from this library repository to
+check the library and example, verify an independent downstream snapshot,
+build the example twice, verify cached artifact stability, and run the executable.
+
+## Development and examples
+
+Requires GoML 0.1.55 or newer. The `examples/basic/` example shares the root manifest. From the library root, run:
+
+```sh
+goml run --example basic
+goml test
+goml verify --timeout 300s
+```
+
+`goml test` builds the example and runs its tests. `goml verify` repeats the example checks as an independent module against an isolated registry snapshot. `(cd ../verification && just ecosystem-test graph)` also retains the library-specific smoke and compatibility checks.
