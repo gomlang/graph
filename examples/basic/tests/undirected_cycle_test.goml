@@ -1,0 +1,21 @@
+package tests;
+
+use ecosystem::graph::{Graph, undirected_cycle};
+use std::testing;
+
+#[test]
+fn downstream_finds_redundant_undirected_connections() -> () {
+    let graph: Graph[string, string] = Graph::new(false);
+    let a = graph.add_node("router A");
+    let b = graph.add_node("router B");
+    let primary = testing::expect_ok(graph.add_edge(a, b, "primary"), "primary");
+    let backup = testing::expect_ok(graph.add_edge(b, a, "backup"), "backup");
+    let cycle = testing::expect_some(
+        testing::expect_ok(undirected_cycle(graph), "search"),
+        "redundancy",
+    );
+    testing::assert_eq(cycle.len(), 2);
+    testing::assert(cycle.contains(primary) && cycle.contains(backup));
+    testing::assert_ok(graph.remove_edge(backup));
+    testing::assert_none(testing::expect_ok(undirected_cycle(graph), "tree"));
+}

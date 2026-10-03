@@ -101,6 +101,18 @@ edges and loops. `clear` takes O(S + E), invalidates every old handle, and retai
 slot history so later insertions never revive deleted handles. Both operations
 preserve graph aliases and the adjacency order of surviving edges.
 
+`undirected_cycle(graph)` provides the equivalent witness for undirected graphs.
+It returns `None` for a forest, one edge for a self-loop, or two distinct edges
+for parallel connections. Witness edges are ordered around the cycle, but an
+edge's stored `from`/`to` direction can oppose traversal. The search skips only
+the exact parent edge and preserves edge identity, including after deletions.
+Directed input returns `RequiresUndirected`. The deterministic depth-first search
+uses an explicit stack, O(V + E) work and O(V + E) auxiliary storage over live
+nodes and adjacency (enumerating graph nodes also visits retained deleted slots).
+An exhaustive four-node graph test checks cycle existence against independent
+transitive-closure/component counts, alongside multiedge, self-loop and deep-graph
+regressions.
+
 Callbacks must not mutate the graph being processed. Shared storage is not
 synchronized for concurrent access. Costs are `i64`; floating weights, graph
 serialization, flow algorithms and dynamic shortest-path maintenance are outside

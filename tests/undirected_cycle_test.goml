@@ -1,0 +1,143 @@
+package tests;
+
+use ecosystem::graph::{Graph, EdgeId, NodeId, ErrorKind, undirected_cycle};
+use std::testing;
+
+fn closes_from(graph: Graph[(), ()], edges: Vec[EdgeId], start: NodeId) -> bool {
+    let mut current = start;
+    let used: HashMap[EdgeId, bool] = HashMap::new();
+    for id in edges {
+        if used.contains(id) {
+            return false
+        }
+        used.set(id, true);
+        let edge = testing::expect_ok(graph.edge(id), "witness edge");
+        if edge.from == current {
+            current = edge.to;
+        } else if edge.to == current {
+            current = edge.from;
+        } else {
+            return false
+        }
+    }
+    current == start
+}
+
+fn check_undirected_cycle(graph: Graph[(), ()], edges: Vec[EdgeId]) -> () {
+    testing::assert(!edges.is_empty());
+    let first = testing::expect_ok(graph.edge(edges[0]), "first edge");
+    testing::assert(closes_from(graph, edges, first.from) || closes_from(graph, edges, first.to));
+}
+
+#[test]
+fn undirected_witness_matches_independent_small_graph_cycle_counts() -> () {
+    // Enumerate every simple undirected graph on four vertices. A graph has a
+    // cycle exactly when edges > vertices - connected components.
+    for mask in 0..64 {
+        let graph: Graph[(), ()] = Graph::new(false);
+        let nodes = Vec::from_array(
+            [graph.add_node(()), graph.add_node(()), graph.add_node(()), graph.add_node(())],
+        );
+        let connected = Vec::from_array(
+            [
+                Vec::from_array([true, false, false, false]),
+                Vec::from_array([false, true, false, false]),
+                Vec::from_array([false, false, true, false]),
+                Vec::from_array([false, false, false, true]),
+            ],
+        );
+        let mut bit = 0;
+        for a in 0..4 {
+            for b in(a + 1)..4 {
+                if (mask & (1 << bit)) != 0 {
+                    // Insert opposite to numeric order to exercise reverse traversal.
+                    testing::assert_ok(graph.add_edge(nodes[b], nodes[a], ()));
+                    connected[a][b] = true;
+                    connected[b][a] = true;
+                }
+                bit += 1;
+            }
+        }
+        for k in 0..4 {
+            for a in 0..4 {
+                for b in 0..4 {
+                    connected[a][b] = connected[a][b] || (connected[a][k] && connected[k][b]);
+                }
+            }
+        }
+        let mut components = 0;
+        for a in 0..4 {
+            let mut first = true;
+            for b in 0..a {
+                if connected[a][b] {
+                    first = false;
+                }
+            }
+            if first {
+                components += 1;
+            }
+        }
+        let witness = testing::expect_ok(undirected_cycle(graph), "search");
+        testing::assert_eq(witness.is_some(), graph.edge_count() > 4 - components);
+        if let Some(edges) = witness {
+            check_undirected_cycle(graph, edges);
+            testing::assert(
+                testing::expect_ok(undirected_cycle(graph), "repeat") == Option::Some(edges),
+            );
+        }
+    }
+}
+
+#[test]
+fn undirected_witness_handles_parallel_edges_self_loops_and_deletion() -> () {
+    let graph: Graph[(), ()] = Graph::new(false);
+    let _ = graph.add_node(());
+    let a = graph.add_node(());
+    let b = graph.add_node(());
+    let first = testing::expect_ok(graph.add_edge(b, a, ()), "first");
+    testing::assert_none(testing::expect_ok(undirected_cycle(graph), "single edge"));
+    let second = testing::expect_ok(graph.add_edge(a, b, ()), "parallel");
+    let witness = testing::expect_some(
+        testing::expect_ok(undirected_cycle(graph), "parallel cycle"),
+        "witness",
+    );
+    testing::assert_eq(witness.len(), 2);
+    testing::assert(witness.contains(first) && witness.contains(second));
+    check_undirected_cycle(graph, witness);
+    testing::assert_ok(graph.remove_edge(first));
+    testing::assert_none(testing::expect_ok(undirected_cycle(graph), "removed parallel"));
+    let loop_edge = testing::expect_ok(graph.add_edge(a, a, ()), "loop");
+    testing::assert(
+        testing::expect_ok(undirected_cycle(graph), "self loop")
+            == Option::Some(Vec::from_array([loop_edge])),
+    );
+    testing::assert_ok(graph.remove_node(a));
+    testing::assert_none(testing::expect_ok(undirected_cycle(graph), "removed node"));
+    graph.clear();
+    testing::assert_none(testing::expect_ok(undirected_cycle(graph), "empty"));
+    let directed: Graph[(), ()] = Graph::new(true);
+    testing::assert_eq(
+        testing::expect_err(undirected_cycle(directed), "wrong graph kind").kind,
+        ErrorKind::RequiresUndirected,
+    );
+}
+
+#[test]
+fn undirected_search_uses_an_explicit_stack_for_deep_graphs() -> () {
+    let graph: Graph[(), ()] = Graph::new(false);
+    let first = graph.add_node(());
+    let mut previous = first;
+    for _ in 0..5000 {
+        let next = graph.add_node(());
+        testing::assert_ok(graph.add_edge(next, previous, ()));
+        previous = next;
+    }
+    testing::assert_none(testing::expect_ok(undirected_cycle(graph), "chain"));
+    testing::assert_ok(graph.add_edge(previous, first, ()));
+    let edges = testing::expect_some(
+        testing::expect_ok(undirected_cycle(graph), "deep cycle"),
+        "witness",
+    );
+    testing::assert_eq(edges.len(), 5001);
+    check_undirected_cycle(graph, edges);
+}
