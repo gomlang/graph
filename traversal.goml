@@ -44,19 +44,10 @@ pub fn dfs[N, E](graph: Graph[N, E], start: NodeId) -> Result[Vec[NodeId], Error
 }
 
 pub fn topological_sort[N, E](graph: Graph[N, E]) -> Result[Vec[NodeId], Error] {
-    if !graph.is_directed() {
-        return Result::Err(
-            error(ErrorKind::RequiresDirected, "topological order requires a directed graph"),
-        )
-    }
-    let degrees: HashMap[NodeId, isize] = HashMap::new();
+    let (degrees, roots) = topological_roots(graph)?;
     let queue: collections::Deque[NodeId] = collections::Deque::new();
-    for node in graph.nodes() {
-        let degree = graph.predecessors(node.0)?.len();
-        degrees.set(node.0, degree);
-        if degree == 0 {
-            queue.push_back(node.0);
-        }
+    for node in roots {
+        queue.push_back(node);
     }
     let result: Vec[NodeId] = Vec::new();
     while let Some(node) = queue.pop_front() {

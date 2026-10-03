@@ -1,0 +1,113 @@
+package tests;
+
+use ecosystem::graph;
+use std::testing;
+
+#[test]
+fn generations_match_independent_reachability_and_longest_paths() -> () {
+    for mask in 0..512 {
+        let graph: graph::Graph[(), ()] = graph::Graph::new(true);
+        let nodes = Vec::from_array([graph.add_node(()), graph.add_node(()), graph.add_node(())]);
+        let reachable = Vec::from_array(
+            [
+                Vec::from_array([false, false, false]),
+                Vec::from_array([false, false, false]),
+                Vec::from_array([false, false, false]),
+            ],
+        );
+        for a in 0..3 {
+            for b in 0..3 {
+                if (mask & (1 << (a * 3 + b))) != 0 {
+                    testing::assert_ok(graph.add_edge(nodes[a], nodes[b], ()));
+                    reachable[a][b] = true;
+                }
+            }
+        }
+        for k in 0..3 {
+            for a in 0..3 {
+                for b in 0..3 {
+                    reachable[a][b] = reachable[a][b] || (reachable[a][k] && reachable[k][b]);
+                }
+            }
+        }
+        let cyclic = reachable[0][0] || reachable[1][1] || reachable[2][2];
+        let result = graph::topological_generations(graph);
+        if cyclic {
+            testing::assert_eq(testing::expect_err(result, "cycle").kind, graph::ErrorKind::Cycle);
+        } else {
+            let distance = Vec::from_array([0, 0, 0]);
+            for _ in 0..3 {
+                for edge in graph.edges() {
+                    let next = distance[edge.from.index()] + 1;
+                    if next > distance[edge.to.index()] {
+                        distance[edge.to.index()] = next;
+                    }
+                }
+            }
+            let generations = testing::expect_ok(result, "DAG");
+            let mut count = 0;
+            for level in 0..generations.len() {
+                let mut previous = -1;
+                for node in generations[level] {
+                    testing::assert_eq(distance[node.index()], level);
+                    testing::assert(node.index() > previous);
+                    previous = node.index();
+                    count += 1;
+                }
+            }
+            testing::assert_eq(count, 3);
+        }
+    }
+}
+
+#[test]
+fn generations_count_parallel_edges_and_handle_deleted_slots_and_isolates() -> () {
+    let graph: graph::Graph[(), ()] = graph::Graph::new(true);
+    let removed = graph.add_node(());
+    let a = graph.add_node(());
+    let b = graph.add_node(());
+    let c = graph.add_node(());
+    let isolated = graph.add_node(());
+    testing::assert_ok(graph.add_edge(removed, a, ()));
+    testing::assert_ok(graph.remove_node(removed));
+    testing::assert_ok(graph.add_edge(a, c, ()));
+    testing::assert_ok(graph.add_edge(a, b, ()));
+    testing::assert_ok(graph.add_edge(a, b, ()));
+    let expected = Vec::from_array([Vec::from_array([a, isolated]), Vec::from_array([b, c])]);
+    testing::assert(
+        testing::expect_ok(graph::topological_generations(graph), "parallel") == expected,
+    );
+    testing::assert_eq(graph.node_count(), 4);
+    testing::assert_eq(graph.edge_count(), 3);
+    testing::assert_ok(graph.add_edge(c, b, ()));
+    let actual = testing::expect_ok(graph::topological_generations(graph), "longest depth");
+    testing::assert(
+        actual
+            == Vec::from_array(
+                [Vec::from_array([a, isolated]), Vec::from_array([c]), Vec::from_array([b])],
+            ),
+    );
+}
+
+#[test]
+fn generations_handle_empty_wrong_kind_and_a_deep_chain() -> () {
+    let graph: graph::Graph[(), ()] = graph::Graph::new(true);
+    testing::assert(testing::expect_ok(graph::topological_generations(graph), "empty").is_empty());
+    let undirected: graph::Graph[(), ()] = graph::Graph::new(false);
+    testing::assert_eq(
+        testing::expect_err(graph::topological_generations(undirected), "undirected").kind,
+        graph::ErrorKind::RequiresDirected,
+    );
+    let mut previous = graph.add_node(());
+    for _ in 0..1000 {
+        let next = graph.add_node(());
+        testing::assert_ok(graph.add_edge(previous, next, ()));
+        previous = next;
+    }
+    let layers = testing::expect_ok(graph::topological_generations(graph), "deep chain");
+    testing::assert_eq(layers.len(), 1001);
+    for index in 0..layers.len() {
+        testing::assert_eq(layers[index].len(), 1);
+        testing::assert_eq(layers[index][0].index(), index);
+    }
+}

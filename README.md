@@ -143,3 +143,21 @@ goml verify --timeout 300s
 ```
 
 `goml test` builds the example and runs its tests. `goml verify` repeats the example checks as an independent module against an isolated registry snapshot. `(cd ../verification && just ecosystem-test graph)` also retains the library-specific smoke and compatibility checks.
+
+### Dependency generations
+
+`topological_generations(graph)` returns `Vec[Vec[NodeId]]`: all zero-indegree
+nodes are generation zero, and every remaining node is in the earliest generation
+after all its predecessors. Equivalently, the generation index is the longest
+path length from any source. Nodes in one generation have no dependencies on each
+other and can be scheduled in parallel once earlier generations have completed.
+Each generation is sorted by ascending stable node index, independent of edge
+insertion order; isolated nodes belong to generation zero.
+
+The graph must be directed. Parallel edges each contribute to indegree, removed
+nodes/edges are skipped, and a cycle anywhere returns `ErrorKind::Cycle` without a
+partial result. An empty directed graph returns no generations. The graph is not
+modified. This iterative algorithm uses O(S + E + V log V) time and O(V + E) additional
+storage (including returned nodes and temporary adjacency lists), where S counts
+retained node slots, V live nodes and E live edges. It has no recursive call depth. The existing
+`topological_sort` retains its FIFO ordering.

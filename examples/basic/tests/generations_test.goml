@@ -1,0 +1,28 @@
+package tests;
+
+use ecosystem::graph;
+use std::testing;
+
+#[test]
+fn consumer_schedules_all_prerequisites_before_the_next_generation() -> () {
+    let tasks: graph::Graph[string, ()] = graph::Graph::new(true);
+    let compile = tasks.add_node("compile");
+    let docs = tasks.add_node("docs");
+    let release = tasks.add_node("release");
+    let tests = tasks.add_node("test");
+    testing::assert_ok(tasks.add_edge(compile, release, ()));
+    testing::assert_ok(tasks.add_edge(compile, tests, ()));
+    testing::assert_ok(tasks.add_edge(docs, release, ()));
+    testing::assert_ok(tasks.add_edge(tests, release, ()));
+    let layers = testing::expect_ok(graph::topological_generations(tasks), "dependency layers");
+    testing::assert(
+        layers
+            == Vec::from_array(
+                [
+                    Vec::from_array([compile, docs]),
+                    Vec::from_array([tests]),
+                    Vec::from_array([release]),
+                ],
+            ),
+    );
+}

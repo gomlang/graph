@@ -1,0 +1,49 @@
+package graph;
+
+fn topological_roots[N, E](graph: Graph[N, E]) -> Result[
+    (HashMap[NodeId, isize], Vec[NodeId]),
+    Error,
+] {
+    if !graph.is_directed() {
+        return Result::Err(
+            error(ErrorKind::RequiresDirected, "topological order requires a directed graph"),
+        )
+    }
+    let degrees: HashMap[NodeId, isize] = HashMap::new();
+    let ready: Vec[NodeId] = Vec::new();
+    for (node, _) in graph.nodes() {
+        let degree = graph.predecessors(node)?.len();
+        degrees.set(node, degree);
+        if degree == 0 {
+            ready.push(node);
+        }
+    }
+    Result::Ok((degrees, ready))
+}
+
+pub fn topological_generations[N, E](graph: Graph[N, E]) -> Result[Vec[Vec[NodeId]], Error] {
+    let (degrees, roots) = topological_roots(graph)?;
+    let mut ready = roots;
+    let result = Vec::new();
+    let mut visited = 0;
+    while !ready.is_empty() {
+        ready.sort_by(|a, b| a.index() - b.index());
+        result.push(ready);
+        visited += ready.len();
+        let next = Vec::new();
+        for node in ready {
+            for neighbor in graph.neighbors(node)? {
+                let previous = degrees.get(neighbor.node).unwrap_or(0);
+                degrees.set(neighbor.node, previous - 1);
+                if previous == 1 {
+                    next.push(neighbor.node);
+                }
+            }
+        }
+        ready = next;
+    }
+    if visited != graph.node_count() {
+        return Result::Err(error(ErrorKind::Cycle, "graph contains a directed cycle"))
+    }
+    Result::Ok(result)
+}
