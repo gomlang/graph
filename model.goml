@@ -144,7 +144,10 @@ impl[N, E] Graph[N, E] {
         if id.slot < 0 || id.slot >= self.node_slots.len() {
             return Result::Err(error(ErrorKind::InvalidNode, "invalid node index"))
         }
-        self.node_slots[id.slot].ok_or(error(ErrorKind::InvalidNode, f"removed {id}"))
+        match self.node_slots[id.slot] {
+            Some(value) => Result::Ok(value),
+            None => Result::Err(error(ErrorKind::InvalidNode, f"removed {id}")),
+        }
     }
 
     pub fn edge(self: Graph[N, E], id: EdgeId) -> Result[Edge[E], Error] {
@@ -154,7 +157,10 @@ impl[N, E] Graph[N, E] {
         if id.slot < 0 || id.slot >= self.edge_slots.len() {
             return Result::Err(error(ErrorKind::InvalidEdge, "invalid edge index"))
         }
-        self.edge_slots[id.slot].ok_or(error(ErrorKind::InvalidEdge, f"removed {id}"))
+        match self.edge_slots[id.slot] {
+            Some(value) => Result::Ok(value),
+            None => Result::Err(error(ErrorKind::InvalidEdge, f"removed {id}")),
+        }
     }
 
     pub fn add_node(self: Graph[N, E], value: N) -> NodeId {

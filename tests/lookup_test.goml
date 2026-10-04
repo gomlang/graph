@@ -1,0 +1,71 @@
+package tests;
+
+use ecosystem::graph;
+use std::testing;
+
+fn assert_lookup_error[T](value: Result[T, graph::Error], kind: graph::ErrorKind, message: string) -> () {
+    match value {
+        Ok(_) => testing::fail("lookup unexpectedly succeeded"),
+        Err(error) => {
+            testing::assert_eq(error.kind, kind);
+            testing::assert_eq(error.message, message);
+        },
+    }
+}
+
+#[test]
+fn lookups_preserve_generic_payload_aliases_and_edge_identity() -> () {
+    let graph: graph::Graph[Ref[isize], Ref[isize]] = graph::Graph::new(false);
+    let label = Ref::new(7);
+    let weight = Ref::new(11);
+    let a = graph.add_node(label);
+    let b = graph.add_node(Ref::new(13));
+    let id = testing::expect_ok(graph.add_edge(a, b, weight), "edge");
+    let node = testing::expect_ok(graph.node(a), "node");
+    testing::assert(ptr_eq(node, label));
+    node.set(17);
+    testing::assert_eq(testing::expect_ok(graph.node(a), "updated label").get(), 17);
+    let edge = testing::expect_ok(graph.edge(id), "edge lookup");
+    testing::assert_eq(edge.id, id);
+    testing::assert_eq(edge.from, a);
+    testing::assert_eq(edge.to, b);
+    testing::assert(ptr_eq(edge.value, weight));
+    edge.value.set(19);
+    testing::assert_eq(testing::expect_ok(graph.edge(id), "updated weight").value.get(), 19);
+}
+
+#[test]
+fn lookup_errors_keep_graph_identity_and_removed_handle_messages() -> () {
+    let graph: graph::Graph[string, isize] = graph::Graph::new(true);
+    let node = graph.add_node("original");
+    let edge = testing::expect_ok(graph.add_edge(node, node, 3), "loop");
+    testing::assert_eq(testing::expect_ok(graph.node(node), "live node"), "original");
+    testing::assert_eq(testing::expect_ok(graph.edge(edge), "live edge").value, 3);
+    testing::assert_ok(graph.remove_node(node));
+    assert_lookup_error(graph.node(node), graph::ErrorKind::InvalidNode, "removed node:0");
+    assert_lookup_error(graph.edge(edge), graph::ErrorKind::InvalidEdge, "removed edge:0");
+    let foreign: graph::Graph[string, isize] = graph::Graph::new(true);
+    let foreign_node = foreign.add_node("foreign");
+    let foreign_edge = testing::expect_ok(
+        foreign.add_edge(foreign_node, foreign_node, 5),
+        "foreign loop",
+    );
+    foreign.clear();
+    assert_lookup_error(
+        graph.node(foreign_node),
+        graph::ErrorKind::WrongGraph,
+        "node belongs to another graph",
+    );
+    assert_lookup_error(
+        graph.edge(foreign_edge),
+        graph::ErrorKind::WrongGraph,
+        "edge belongs to another graph",
+    );
+    let next = graph.add_node("next");
+    let next_edge = testing::expect_ok(graph.add_edge(next, next, 23), "next edge");
+    graph.clear();
+    assert_lookup_error(graph.node(next), graph::ErrorKind::InvalidNode, "removed node:1");
+    assert_lookup_error(graph.edge(next_edge), graph::ErrorKind::InvalidEdge, "removed edge:1");
+    let live = graph.add_node("live");
+    testing::assert_eq(testing::expect_ok(graph.node(live), "after clear"), "live");
+}
