@@ -12,7 +12,7 @@ fn topological_roots[N, E](graph: Graph[N, E]) -> Result[
     let degrees: HashMap[NodeId, isize] = HashMap::new();
     let ready: Vec[NodeId] = Vec::new();
     for (node, _) in graph.nodes() {
-        let degree = graph.predecessors(node)?.len();
+        let degree = graph.incoming[node.slot].len();
         degrees.set(node, degree);
         if degree == 0 {
             ready.push(node);
