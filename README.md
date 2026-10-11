@@ -128,21 +128,21 @@ every source, 32 complete four-node graphs compared against exhaustive spanning
 tree subsets, A* reopening and a 3,000-node chain/cycle.
 
 `examples/basic` supplies its own label types. Run
-`(cd ../verification && just ecosystem-test graph)` from this library repository to
+`(cd ../workflows && just ecosystem-test graph)` from this library repository to
 check the library and example, check cached builds,
 build the example twice, verify cached artifact stability, and run the executable.
 
 ## Development and examples
 
-Requires the [current GoML toolchain](https://github.com/gomlang/verification/blob/main/ci/toolchain.json) with unversioned registry support. The `examples/basic/` example shares the root manifest. From the library root, run:
+Requires the [current GoML toolchain](https://github.com/gomlang/workflows/blob/main/ci/toolchain.json) with unversioned registry support. The `examples/basic/` example shares the root manifest. From the library root, run:
 
 ```sh
 goml run --example basic
 goml test
-(cd ../verification && just ecosystem-test graph)
+(cd ../workflows && just ecosystem-test graph)
 ```
 
-`goml test` builds the example and runs its tests. `(cd ../verification && just ecosystem-test graph)` runs the library-specific smoke and compatibility checks.
+`goml test` builds the example and runs its tests. `(cd ../workflows && just ecosystem-test graph)` runs the library-specific smoke and compatibility checks.
 
 ### Dependency generations
 
